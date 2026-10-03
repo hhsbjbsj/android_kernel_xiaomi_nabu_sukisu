@@ -528,11 +528,12 @@ int ksu_handle_faccessat(int *dfd, struct filename **filename, int *mode, int *_
 {
     const struct cred *old_cred;
 
-    if (!static_branch_unlikely(&ksu_su_compat_enabled)) {
-        return 0;
-    }
+    // we no need harden this check, susfs already complete in caller
+    // if (ksu_is_current_proc_unprivillege()) {
+    //     return 0;
+    // }
 
-    if (!ksu_is_allow_uid_for_current(ksu_get_uid_t(current_uid()))) {
+    if (!static_branch_unlikely(&ksu_su_compat_enabled)) {
         return 0;
     }
 
@@ -556,20 +557,14 @@ int ksu_handle_faccessat(int *dfd, struct filename **filename, int *mode, int *_
 #else
 int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *__unused_flags)
 {
-    char path[sizeof(su_path) + 1] = { 0 };
-    char __user *sh_p;
-    const struct cred *old_cred;
-    bool ksud_exists;
-
     if (!ksu_is_allow_uid_for_current(ksu_get_uid_t(current_uid()))) {
         return 0;
     }
 
-#ifdef CONFIG_KSU_SUSFS
-    if (susfs_is_current_proc_no_su()) {
-        return 0;
-    }
-#elif !defined(CONFIG_KSU_TRACEPOINT_HOOK)
+    char path[sizeof(su_path) + 1] = { 0 };
+    const struct cred *old_cred;
+
+#ifndef CONFIG_KSU_TRACEPOINT_HOOK
     if (ksu_is_current_proc_unprivillege()) {
         return 0;
     }
@@ -585,28 +580,21 @@ int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode,
     }
 #endif
 
-    if (unlikely(!filename_user || !*filename_user))
+    if (!ksu_is_allow_uid_for_current(ksu_get_uid_t(current_uid())))
         return 0;
 
-    if (ksu_strncpy_from_user_nofault(path, *filename_user, sizeof(path)) < 0)
-        return 0;
+    ksu_strncpy_from_user_nofault(path, *filename_user, sizeof(path));
 
-    if (likely(memcmp(path, su_path, sizeof(su_path))))
-        return 0;
+    if (unlikely(!memcmp(path, su_path, sizeof(su_path)))) {
+        old_cred = override_creds(ksu_cred);
+        if (is_ksud_exists()) {
+            pr_info("ksu_handle_faccessat su->sh!\n");
+            *filename_user = sh_user_path();
+        } else {
+            pr_info("no ksud found, don't process faccessat for su!");
+        }
 
-    old_cred = override_creds(ksu_cred);
-    ksud_exists = is_ksud_exists();
-    revert_creds(old_cred);
-
-    if (!ksud_exists) {
-        pr_info("no ksud found, don't process faccessat for su!\n");
-        return 0;
-    }
-
-    pr_info("ksu_handle_faccessat su->sh!\n");
-    sh_p = sh_user_path();
-    if (sh_p) {
-        *filename_user = sh_p;
+        revert_creds(old_cred);
     }
 
     return 0;
@@ -617,6 +605,11 @@ int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode,
 int ksu_handle_stat(int *dfd, struct filename **filename, int *flags)
 {
     const struct cred *old_cred;
+
+    // we no need harden this check, susfs already complete in caller
+    // if (ksu_is_current_proc_unprivillege()) {
+    //     return 0;
+    // }
 
     if (!static_branch_unlikely(&ksu_su_compat_enabled)) {
         return 0;
@@ -647,26 +640,22 @@ int ksu_handle_stat(int *dfd, struct filename **filename, int *flags)
 #else
 int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags)
 {
-    char path[sizeof(su_path) + 1] = { 0 };
-    char __user *sh_p;
-    const struct cred *old_cred;
-    bool ksud_exists;
-
     if (!ksu_is_allow_uid_for_current(ksu_get_uid_t(current_uid()))) {
         return 0;
     }
 
-#ifdef CONFIG_KSU_SUSFS
-    if (susfs_is_current_proc_no_su()) {
-        return 0;
-    }
-#elif !defined(CONFIG_KSU_TRACEPOINT_HOOK)
+    const struct cred *old_cred;
+    char path[sizeof(su_path) + 1] = { 0 };
+
+#ifndef CONFIG_KSU_TRACEPOINT_HOOK
     if (ksu_is_current_proc_unprivillege()) {
         return 0;
     }
 #endif
 
 #ifdef KSU_COMPAT_USE_STATIC_KEY
+    // Yep, maybe someusers love turn off sucompat <- idk how they managed to keep using it
+    // But for mostly users, sucompat is enabled, so unlikely here
     if (!static_branch_unlikely(&ksu_su_compat_enabled)) {
         return 0;
     }
@@ -676,29 +665,25 @@ int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags)
     }
 #endif
 
-    if (unlikely(!filename_user || !*filename_user)) {
+    if (unlikely(!filename_user)) {
         return 0;
     }
 
-    if (ksu_strncpy_from_user_nofault(path, *filename_user, sizeof(path)) < 0)
+    if (!ksu_is_allow_uid_for_current(ksu_get_uid_t(current_uid())))
         return 0;
 
-    if (likely(memcmp(path, su_path, sizeof(su_path))))
-        return 0;
+    ksu_strncpy_from_user_nofault(path, *filename_user, sizeof(path));
 
-    old_cred = override_creds(ksu_cred);
-    ksud_exists = is_ksud_exists();
-    revert_creds(old_cred);
+    if (unlikely(!memcmp(path, su_path, sizeof(su_path)))) {
+        old_cred = override_creds(ksu_cred);
+        if (is_ksud_exists()) {
+            pr_info("ksu_handle_stat su->sh!\n");
+            *filename_user = sh_user_path();
+        } else {
+            pr_info("no ksud found, don't process stat for su!");
+        }
 
-    if (!ksud_exists) {
-        pr_info("no ksud found, don't process stat for su!\n");
-        return 0;
-    }
-
-    pr_info("ksu_handle_stat su->sh!\n");
-    sh_p = sh_user_path();
-    if (sh_p) {
-        *filename_user = sh_p;
+        revert_creds(old_cred);
     }
 
     return 0;

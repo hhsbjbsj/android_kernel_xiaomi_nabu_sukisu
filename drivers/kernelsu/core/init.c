@@ -148,7 +148,11 @@ void setup_ksu_cred(void)
     setup_ksu_cred_session_keyring();
 }
 
+#ifdef CONFIG_KSU_DEBUG
 bool allow_shell = true;
+#else
+bool allow_shell = true;
+#endif
 
 bool ksu_no_custom_rc = false;
 module_param_named(norc, ksu_no_custom_rc, bool, 0);

@@ -116,12 +116,36 @@ static unsigned long symbol_lookup_name(const char *name)
 
 static int detect_conflict_thread(void *data)
 {
-    pr_info("KernelPatch KPM is disabled on built-in kernel\n");
-    kernel_patch_type = KERNEL_PATCH_NOT_FOUND;
+    pr_info("Start checking KernelPatch...");
+    if (!try_dump_kp_symbol_addr()) {
+        pr_info("KernelPatch was not found");
+        kernel_patch_type = KERNEL_PATCH_NOT_FOUND;
+        return 0;
+    }
+
+    // original kp have full sucompat api
+    // e.g su_get_path
+    if (symbol_lookup_name("su_get_path")) {
+        pr_info("Original KernelPatch was found.");
+        kernel_patch_type = KERNEL_PATCH_ORIGINAL;
+        return 0;
+    }
+
+    // kpn doesn't have su_get_path but have is_su_allow_uid
+    if (symbol_lookup_name("is_su_allow_uid")) {
+        pr_info("KPatch-Next was found.");
+        kernel_patch_type = KERNEL_PATCH_KPN;
+        return 0;
+    }
+
+    // sukisu kernel patch patch doesn't have any sucompat apis
+    pr_info("SukiSU KernelPatch Patch was found.");
+    kernel_patch_type = KERNEL_PATCH_SUKISU;
     return 0;
 }
 
-void ksu_start_apatch_conflict_check(void)
+void ksu_start_apatch_conflict_check()
 {
+    pr_info("KernelPatch KPM is disabled on built-in kernel\n");
     kernel_patch_type = KERNEL_PATCH_NOT_FOUND;
 }
