@@ -32,9 +32,18 @@ setup_miui_keyboard()
 setup_ufs_io()
 {
 	BK_UFS_SCHEDULER=/sys/block/sda/queue/scheduler
-	[ -w "$BK_UFS_SCHEDULER" ] || return 0
-	grep -qw noop "$BK_UFS_SCHEDULER" 2>/dev/null || return 0
-	printf '%s\n' noop > "$BK_UFS_SCHEDULER" 2>/dev/null || true
+	if [ -w "$BK_UFS_SCHEDULER" ] && grep -qw noop "$BK_UFS_SCHEDULER" 2>/dev/null; then
+		printf '%s\n' noop > "$BK_UFS_SCHEDULER" 2>/dev/null || true
+	fi
+	for BK_UFS_LUN in /sys/block/sd[a-f]/queue; do
+		[ -d "$BK_UFS_LUN" ] || continue
+		if [ -w "$BK_UFS_LUN/scheduler" ] && grep -qw noop "$BK_UFS_LUN/scheduler" 2>/dev/null; then
+			printf '%s\n' noop > "$BK_UFS_LUN/scheduler" 2>/dev/null || true
+		fi
+		printf '%s\n' 512 > "$BK_UFS_LUN/read_ahead_kb" 2>/dev/null || true
+		printf '%s\n' 256 > "$BK_UFS_LUN/nr_requests" 2>/dev/null || true
+		printf '%s\n' 0 > "$BK_UFS_LUN/iostats" 2>/dev/null || true
+	done
 }
 
 setup_extphone_stub()

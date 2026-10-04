@@ -116,6 +116,26 @@ reb_apply_cpu_policies()
 		reb_write "$REB_LITTLE_POLICY/schedutil/hispeed_load" 75
 		reb_write "$REB_LITTLE_POLICY/schedutil/hispeed_freq" 1708800
 	fi
+	REB_GOLD_POLICY=/sys/devices/system/cpu/cpufreq/policy4
+	if [ -d "$REB_GOLD_POLICY" ]; then
+		reb_write "$REB_GOLD_POLICY/schedutil/hispeed_load" 80
+	fi
+	REB_PRIME_POLICY=/sys/devices/system/cpu/cpufreq/policy7
+	if [ -d "$REB_PRIME_POLICY" ]; then
+		reb_write "$REB_PRIME_POLICY/schedutil/hispeed_load" 80
+	fi
+}
+
+reb_apply_gpu()
+{
+	REB_GPU_DEVFREQ=/sys/class/kgsl/kgsl-3d0/devfreq
+	if [ -d "$REB_GPU_DEVFREQ" ]; then
+		if reb_screen_on; then
+			reb_write "$REB_GPU_DEVFREQ/min_freq" 345000000
+		else
+			reb_write "$REB_GPU_DEVFREQ/min_freq" 257000000
+		fi
+	fi
 }
 
 reb_apply_memory()
@@ -567,6 +587,7 @@ reb_apply_base()
 	reb_apply_cpuset
 	reb_apply_memory
 	reb_apply_cpu_policies
+	reb_apply_gpu
 }
 
 reb_read_tid_identity()
