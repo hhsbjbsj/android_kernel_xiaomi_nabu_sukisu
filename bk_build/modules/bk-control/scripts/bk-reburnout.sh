@@ -348,6 +348,7 @@ reb_update_perf_taskset()
 	[ "$REB_PERF_TASKSET" = "$REB_NEW_PERF_TASKSET" ] && return 0
 	REB_PERF_TASKSET=$REB_NEW_PERF_TASKSET
 	REB_LAST_COMPOSER_TASK_COUNT=-1
+	REB_LAST_SF_TASK_COUNT=-1
 	REB_LAST_HOME_TASK_COUNT=-1
 	REB_LAST_SYSTEMUI_TASK_COUNT=-1
 	rm -f "$REB_UI_TIDS_FILE" "$REB_UI_TIDS_TMP"
@@ -385,6 +386,31 @@ reb_pin_composer()
 	done
 	REB_LAST_COMPOSER_PIDS=$REB_COMPOSER_PIDS
 	REB_LAST_COMPOSER_TASK_COUNT=$REB_COMPOSER_TASK_COUNT
+}
+
+reb_pin_surfaceflinger()
+{
+	REB_SF_PIDS=$(pidof surfaceflinger 2>/dev/null)
+	REB_SF_TASK_COUNT=0
+	REB_SF_REFRESH=0
+	for REB_PROCESS_PID in $REB_SF_PIDS; do
+		for REB_SF_TASK in /proc/$REB_PROCESS_PID/task/*; do
+			[ -d "$REB_SF_TASK" ] && \
+				REB_SF_TASK_COUNT=$((REB_SF_TASK_COUNT + 1))
+		done
+		reb_read_allowed_list "$REB_PROCESS_PID"
+		reb_allowed_matches_perf || REB_SF_REFRESH=1
+	done
+	if [ "$REB_SF_PIDS" != "$REB_LAST_SF_PIDS" ] || \
+	   [ "$REB_SF_TASK_COUNT" -ne "$REB_LAST_SF_TASK_COUNT" ]; then
+		REB_SF_REFRESH=1
+	fi
+	[ "$REB_SF_REFRESH" -eq 1 ] || return 0
+	for REB_PROCESS_PID in $REB_SF_PIDS; do
+		taskset -ap "$REB_PERF_TASKSET" "$REB_PROCESS_PID" >/dev/null 2>&1 || true
+	done
+	REB_LAST_SF_PIDS=$REB_SF_PIDS
+	REB_LAST_SF_TASK_COUNT=$REB_SF_TASK_COUNT
 }
 
 reb_pin_home()
@@ -478,6 +504,7 @@ reb_tune_transition_threads()
 			case "$REB_UI_COMM" in
 				wmshell.main|wmshell.anim|wmshell.recents*|recents.anim*|\
 				wm-transition*|wmshell.splash|miui_wm_sight|doUnLockAppAnim|\
+				Keyguard*|Scrim*|StatusBar*|Notification*|AsyncLayout*|GLThread*|\
 				SurfaceSyncGrou|RenderThread|ControlCenterTr) ;;
 				*) continue ;;
 			esac
@@ -549,6 +576,15 @@ reb_widget_boost_tick()
 	fi
 	REB_HOME_PREV_JIFFIES=$REB_HOME_JIFFIES
 
+	if [ "$REB_WIDGET_ADJ" -le 0 ]; then
+		if [ "${REB_FIRST_DESKTOP_BURST:-0}" -eq 0 ]; then
+			REB_FIRST_DESKTOP_BURST=1
+			REB_DESKTOP_BURST_TICKS=2
+			reb_enter_mode
+			reb_log "first desktop entry burst pid=$REB_WIDGET_HOME_PID adj=$REB_WIDGET_ADJ"
+		fi
+	fi
+
 	if [ "$REB_WIDGET_ADJ" -le 0 ] && [ "$REB_HOME_DELTA" -ge 25 ]; then
 		REB_WIDGET_HIGH_COUNT=$((REB_WIDGET_HIGH_COUNT + 1))
 		REB_WIDGET_LOW_COUNT=0
@@ -580,11 +616,24 @@ reb_pin_ui()
 {
 	reb_update_perf_taskset
 	reb_pin_composer
+	reb_pin_surfaceflinger
 	REB_HOME_PIDS=$(pidof com.miui.home 2>/dev/null)
 	reb_widget_boost_tick
 	reb_pin_home
 	reb_tune_transition_threads
 	reb_tune_audio
+}
+
+reb_apply_gpu()
+{
+	REB_GPU_DEVFREQ=/sys/class/kgsl/kgsl-3d0/devfreq
+	if [ -d "$REB_GPU_DEVFREQ" ]; then
+		if reb_screen_on; then
+			reb_write "$REB_GPU_DEVFREQ/min_freq" 345000000
+		else
+			reb_write "$REB_GPU_DEVFREQ/min_freq" 257000000
+		fi
+	fi
 }
 
 reb_apply_base()
@@ -593,6 +642,7 @@ reb_apply_base()
 	reb_apply_memory
 	reb_apply_cpu_policies
 	reb_apply_schedtune
+	reb_apply_gpu
 }
 
 reb_read_tid_identity()
@@ -983,10 +1033,14 @@ printf '%s\n' "$$" > "$REB_PID_FILE"
 REB_MODE=0
 REB_LAST_COMPOSER_PIDS=
 REB_LAST_COMPOSER_TASK_COUNT=-1
+REB_LAST_SF_PIDS=
+REB_LAST_SF_TASK_COUNT=-1
 REB_LAST_HOME_PIDS=
 REB_LAST_HOME_TASK_COUNT=-1
 REB_LAST_SYSTEMUI_PIDS=
 REB_LAST_SYSTEMUI_TASK_COUNT=-1
+REB_FIRST_DESKTOP_BURST=0
+REB_DESKTOP_BURST_TICKS=0
 REB_WIDGET_MODE=0
 REB_WIDGET_HIGH_COUNT=0
 REB_WIDGET_LOW_COUNT=0
@@ -1106,6 +1160,16 @@ while :; do
 	if [ -e "$REB_DISABLE_FILE" ]; then
 		reb_leave_mode
 		reb_write_status disabled
+		continue
+	fi
+
+	if [ "${REB_DESKTOP_BURST_TICKS:-0}" -gt 0 ]; then
+		REB_DESKTOP_BURST_TICKS=$((REB_DESKTOP_BURST_TICKS - 1))
+		reb_enter_mode
+		reb_refresh_top_app
+		reb_enforce_mode_nodes
+		reb_write_status active
+		[ "$REB_DESKTOP_BURST_TICKS" -eq 0 ] && reb_leave_mode
 		continue
 	fi
 
