@@ -35,12 +35,6 @@ setup_ufs_io()
 	[ -w "$BK_UFS_SCHEDULER" ] || return 0
 	grep -qw noop "$BK_UFS_SCHEDULER" 2>/dev/null || return 0
 	printf '%s\n' noop > "$BK_UFS_SCHEDULER" 2>/dev/null || true
-	for BK_UFS_LUN in /sys/block/sd[a-f]/queue; do
-		[ -d "$BK_UFS_LUN" ] || continue
-		printf '%s\n' 512 > "$BK_UFS_LUN/read_ahead_kb" 2>/dev/null || true
-		printf '%s\n' 256 > "$BK_UFS_LUN/nr_requests" 2>/dev/null || true
-		printf '%s\n' 0 > "$BK_UFS_LUN/iostats" 2>/dev/null || true
-	done
 }
 
 setup_extphone_stub()

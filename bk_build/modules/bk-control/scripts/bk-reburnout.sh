@@ -116,29 +116,6 @@ reb_apply_cpu_policies()
 		reb_write "$REB_LITTLE_POLICY/schedutil/hispeed_load" 75
 		reb_write "$REB_LITTLE_POLICY/schedutil/hispeed_freq" 1708800
 	fi
-	REB_GOLD_POLICY=/sys/devices/system/cpu/cpufreq/policy4
-	if [ -d "$REB_GOLD_POLICY" ]; then
-		reb_write "$REB_GOLD_POLICY/schedutil/hispeed_load" 75
-		reb_write "$REB_GOLD_POLICY/schedutil/hispeed_freq" 1920000
-	fi
-	REB_PRIME_POLICY=/sys/devices/system/cpu/cpufreq/policy7
-	if [ -d "$REB_PRIME_POLICY" ]; then
-		reb_write "$REB_PRIME_POLICY/schedutil/hispeed_load" 75
-		reb_write "$REB_PRIME_POLICY/schedutil/hispeed_freq" 2016000
-	fi
-	if [ -d /sys/module/cpu_boost/parameters ]; then
-		reb_write /sys/module/cpu_boost/parameters/input_boost_freq "0:1305600 4:1708800 7:1708800"
-		reb_write /sys/module/cpu_boost/parameters/input_boost_ms 100
-	fi
-}
-
-reb_apply_schedtune()
-{
-	reb_write /dev/stune/top-app/schedtune.boost 10
-	reb_write /dev/stune/top-app/schedtune.prefer_idle 1
-	reb_write /dev/stune/foreground/schedtune.boost 0
-	reb_write /dev/stune/foreground/schedtune.prefer_idle 1
-	reb_write /dev/stune/schedtune.boost 0
 }
 
 reb_apply_memory()
@@ -348,7 +325,6 @@ reb_update_perf_taskset()
 	[ "$REB_PERF_TASKSET" = "$REB_NEW_PERF_TASKSET" ] && return 0
 	REB_PERF_TASKSET=$REB_NEW_PERF_TASKSET
 	REB_LAST_COMPOSER_TASK_COUNT=-1
-	REB_LAST_SF_TASK_COUNT=-1
 	REB_LAST_HOME_TASK_COUNT=-1
 	REB_LAST_SYSTEMUI_TASK_COUNT=-1
 	rm -f "$REB_UI_TIDS_FILE" "$REB_UI_TIDS_TMP"
@@ -386,31 +362,6 @@ reb_pin_composer()
 	done
 	REB_LAST_COMPOSER_PIDS=$REB_COMPOSER_PIDS
 	REB_LAST_COMPOSER_TASK_COUNT=$REB_COMPOSER_TASK_COUNT
-}
-
-reb_pin_surfaceflinger()
-{
-	REB_SF_PIDS=$(pidof surfaceflinger 2>/dev/null)
-	REB_SF_TASK_COUNT=0
-	REB_SF_REFRESH=0
-	for REB_PROCESS_PID in $REB_SF_PIDS; do
-		for REB_SF_TASK in /proc/$REB_PROCESS_PID/task/*; do
-			[ -d "$REB_SF_TASK" ] && \
-				REB_SF_TASK_COUNT=$((REB_SF_TASK_COUNT + 1))
-		done
-		reb_read_allowed_list "$REB_PROCESS_PID"
-		reb_allowed_matches_perf || REB_SF_REFRESH=1
-	done
-	if [ "$REB_SF_PIDS" != "$REB_LAST_SF_PIDS" ] || \
-	   [ "$REB_SF_TASK_COUNT" -ne "$REB_LAST_SF_TASK_COUNT" ]; then
-		REB_SF_REFRESH=1
-	fi
-	[ "$REB_SF_REFRESH" -eq 1 ] || return 0
-	for REB_PROCESS_PID in $REB_SF_PIDS; do
-		taskset -ap "$REB_PERF_TASKSET" "$REB_PROCESS_PID" >/dev/null 2>&1 || true
-	done
-	REB_LAST_SF_PIDS=$REB_SF_PIDS
-	REB_LAST_SF_TASK_COUNT=$REB_SF_TASK_COUNT
 }
 
 reb_pin_home()
@@ -451,8 +402,6 @@ reb_pin_home()
 			IFS= read -r REB_HOME_COMM < "$REB_HOME_TASK/comm" 2>/dev/null || true
 			case "$REB_HOME_COMM" in
 				RenderThread|HwuiTask*|hwuiTask*|HomeShellAnim|\
-				launcher-load*|launcher-thre*|IconLoader*|ModelLoader*|\
-				PackageUpdate*|ScrollThread*|GestureThread*|WorkspaceAnim*|\
 				SurfaceSyncGrou|AnimThread*|FsGestureSecond)
 					reb_read_allowed_list "${REB_HOME_TASK##*/}"
 					reb_allowed_matches_perf || \
@@ -504,7 +453,6 @@ reb_tune_transition_threads()
 			case "$REB_UI_COMM" in
 				wmshell.main|wmshell.anim|wmshell.recents*|recents.anim*|\
 				wm-transition*|wmshell.splash|miui_wm_sight|doUnLockAppAnim|\
-				Keyguard*|Scrim*|StatusBar*|Notification*|AsyncLayout*|GLThread*|\
 				SurfaceSyncGrou|RenderThread|ControlCenterTr) ;;
 				*) continue ;;
 			esac
@@ -576,15 +524,6 @@ reb_widget_boost_tick()
 	fi
 	REB_HOME_PREV_JIFFIES=$REB_HOME_JIFFIES
 
-	if [ "$REB_WIDGET_ADJ" -le 0 ]; then
-		if [ "${REB_FIRST_DESKTOP_BURST:-0}" -eq 0 ]; then
-			REB_FIRST_DESKTOP_BURST=1
-			REB_DESKTOP_BURST_TICKS=2
-			reb_enter_mode
-			reb_log "first desktop entry burst pid=$REB_WIDGET_HOME_PID adj=$REB_WIDGET_ADJ"
-		fi
-	fi
-
 	if [ "$REB_WIDGET_ADJ" -le 0 ] && [ "$REB_HOME_DELTA" -ge 25 ]; then
 		REB_WIDGET_HIGH_COUNT=$((REB_WIDGET_HIGH_COUNT + 1))
 		REB_WIDGET_LOW_COUNT=0
@@ -616,7 +555,6 @@ reb_pin_ui()
 {
 	reb_update_perf_taskset
 	reb_pin_composer
-	reb_pin_surfaceflinger
 	REB_HOME_PIDS=$(pidof com.miui.home 2>/dev/null)
 	reb_widget_boost_tick
 	reb_pin_home
@@ -624,25 +562,11 @@ reb_pin_ui()
 	reb_tune_audio
 }
 
-reb_apply_gpu()
-{
-	REB_GPU_DEVFREQ=/sys/class/kgsl/kgsl-3d0/devfreq
-	if [ -d "$REB_GPU_DEVFREQ" ]; then
-		if reb_screen_on; then
-			reb_write "$REB_GPU_DEVFREQ/min_freq" 345000000
-		else
-			reb_write "$REB_GPU_DEVFREQ/min_freq" 257000000
-		fi
-	fi
-}
-
 reb_apply_base()
 {
 	reb_apply_cpuset
 	reb_apply_memory
 	reb_apply_cpu_policies
-	reb_apply_schedtune
-	reb_apply_gpu
 }
 
 reb_read_tid_identity()
@@ -1033,14 +957,10 @@ printf '%s\n' "$$" > "$REB_PID_FILE"
 REB_MODE=0
 REB_LAST_COMPOSER_PIDS=
 REB_LAST_COMPOSER_TASK_COUNT=-1
-REB_LAST_SF_PIDS=
-REB_LAST_SF_TASK_COUNT=-1
 REB_LAST_HOME_PIDS=
 REB_LAST_HOME_TASK_COUNT=-1
 REB_LAST_SYSTEMUI_PIDS=
 REB_LAST_SYSTEMUI_TASK_COUNT=-1
-REB_FIRST_DESKTOP_BURST=0
-REB_DESKTOP_BURST_TICKS=0
 REB_WIDGET_MODE=0
 REB_WIDGET_HIGH_COUNT=0
 REB_WIDGET_LOW_COUNT=0
@@ -1056,19 +976,19 @@ case "$(uname -r)" in
 	*) reb_log "ignored on incompatible kernel $(uname -r)"; exit 0 ;;
 esac
 
-# service.d starts before Android reports boot completion.  Install base
-# policies and allocation reserve so they cover boot and lockscreen interactions.
-reb_apply_base
+# service.d starts before Android reports boot completion.  Install the
+# allocation reserve here so it also covers the late modem/QRTR startup burst.
+reb_apply_memory
 reb_init_process_reclaim
 
 while [ "$(getprop sys.boot_completed 2>/dev/null)" != "1" ]; do
-	sleep 0.5
+	sleep 2
 done
 
 # HyperOS may configure zram before its encrypted per-boot backing directory
-# and a free loop node are both available.  Defer attachment so 1GB fallocate
-# never contends with desktop unlock and initial launcher rendering.
-(sleep 25 && reb_setup_zram_backing) &
+# and a free loop node are both available.  The kernel accepts this first late
+# backing attachment without resetting active swap.
+reb_setup_zram_backing
 
 REB_BOOT_ID=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)
 if [ -r "$REB_RESTORE_FILE" ]; then
@@ -1084,12 +1004,6 @@ if [ -r "$REB_RESTORE_FILE" ]; then
 	fi
 fi
 
-# Instant Unlock Burst: run hardware at max clock for 3.5s while launcher loads icons & widgets
-reb_apply_base
-reb_screen_on && reb_pin_ui
-reb_enter_mode
-sleep 3.5
-reb_leave_mode
 reb_apply_base
 reb_screen_on && reb_pin_ui
 set -- $(reb_read_cpu_sample)
@@ -1160,16 +1074,6 @@ while :; do
 	if [ -e "$REB_DISABLE_FILE" ]; then
 		reb_leave_mode
 		reb_write_status disabled
-		continue
-	fi
-
-	if [ "${REB_DESKTOP_BURST_TICKS:-0}" -gt 0 ]; then
-		REB_DESKTOP_BURST_TICKS=$((REB_DESKTOP_BURST_TICKS - 1))
-		reb_enter_mode
-		reb_refresh_top_app
-		reb_enforce_mode_nodes
-		reb_write_status active
-		[ "$REB_DESKTOP_BURST_TICKS" -eq 0 ] && reb_leave_mode
 		continue
 	fi
 
