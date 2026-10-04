@@ -37,7 +37,7 @@ config_init()
 		echo 'protected_writeback=1'
 		echo 'widget_boost=1'
 		echo 'touch_firmware=modern'
-		echo 'swappiness=180'
+		echo 'swappiness=100'
 		echo 'mode=auto'
 	} > "$CONFIG_TMP" || return 1
 	mv -f "$CONFIG_TMP" "$CONFIG"
@@ -133,7 +133,7 @@ set_value()
 			write_node "$BK_TOUCH_NODE" "$BK_VALUE"
 			;;
 		swappiness)
-			case "$BK_VALUE" in 160|180) ;; *) return 1 ;; esac
+			case "$BK_VALUE" in 60|80|100|160|180) ;; *) return 1 ;; esac
 			config_set "$BK_NAME" "$BK_VALUE" || return 1
 			apply_swappiness "$BK_VALUE"
 			;;

@@ -89,8 +89,8 @@ reb_apply_cpuset()
 
 reb_apply_swappiness()
 {
-	reb_config_get swappiness 180
-	case "$REB_CONFIG_VALUE" in 160|180) ;; *) REB_CONFIG_VALUE=180 ;; esac
+	reb_config_get swappiness 100
+	case "$REB_CONFIG_VALUE" in 60|80|100|160|180) ;; *) REB_CONFIG_VALUE=100 ;; esac
 	reb_write /proc/sys/vm/swappiness "$REB_CONFIG_VALUE"
 	for REB_SWAPPINESS_NODE in \
 		/dev/memcg/memory.swappiness \
@@ -101,25 +101,32 @@ reb_apply_swappiness()
 	done
 }
 
-reb_apply_little_policy()
+reb_apply_cpu_policies()
 {
+	for REB_CPU_POLICY in /sys/devices/system/cpu/cpufreq/policy*; do
+		[ -d "$REB_CPU_POLICY" ] || continue
+		reb_write "$REB_CPU_POLICY/scaling_governor" schedutil
+		reb_write "$REB_CPU_POLICY/schedutil/up_rate_limit_us" 0
+		reb_write "$REB_CPU_POLICY/schedutil/down_rate_limit_us" 10000
+		reb_write "$REB_CPU_POLICY/schedutil/pl" 1
+	done
 	REB_LITTLE_POLICY=/sys/devices/system/cpu/cpufreq/policy0
-	[ -d "$REB_LITTLE_POLICY" ] || return 0
-	reb_write "$REB_LITTLE_POLICY/scaling_governor" schedutil
-	reb_write "$REB_LITTLE_POLICY/scaling_min_freq" 672000
-	reb_write "$REB_LITTLE_POLICY/schedutil/up_rate_limit_us" 0
-	reb_write "$REB_LITTLE_POLICY/schedutil/down_rate_limit_us" 10000
-	reb_write "$REB_LITTLE_POLICY/schedutil/hispeed_load" 75
-	reb_write "$REB_LITTLE_POLICY/schedutil/hispeed_freq" 1708800
-	reb_write "$REB_LITTLE_POLICY/schedutil/pl" 1
+	if [ -d "$REB_LITTLE_POLICY" ]; then
+		reb_write "$REB_LITTLE_POLICY/scaling_min_freq" 672000
+		reb_write "$REB_LITTLE_POLICY/schedutil/hispeed_load" 75
+		reb_write "$REB_LITTLE_POLICY/schedutil/hispeed_freq" 1708800
+	fi
 }
 
 reb_apply_memory()
 {
-	# Keep a usable atomic reserve during the QRTR/glink burst at boot.  The
-	# stock 9 MiB minimum produced repeatable order-0 allocation failures.
+	# Keep a usable atomic reserve during the QRTR/glink burst at boot.
 	reb_write /proc/sys/vm/min_free_kbytes 32768
-	reb_write /proc/sys/vm/watermark_scale_factor 10
+	reb_write /proc/sys/vm/extra_free_kbytes 24576
+	reb_write /proc/sys/vm/watermark_scale_factor 150
+	reb_write /proc/sys/vm/vfs_cache_pressure 70
+	reb_write /proc/sys/vm/dirty_ratio 15
+	reb_write /proc/sys/vm/dirty_background_ratio 5
 	reb_write /proc/sys/vm/page-cluster 0
 	reb_apply_swappiness
 }
@@ -444,7 +451,8 @@ reb_tune_transition_threads()
 			REB_UI_COMM=
 			IFS= read -r REB_UI_COMM < "$REB_TASK/comm" 2>/dev/null || true
 			case "$REB_UI_COMM" in
-				wmshell.main|wmshell.anim|miui_wm_sight|doUnLockAppAnim|\
+				wmshell.main|wmshell.anim|wmshell.recents*|recents.anim*|\
+				wm-transition*|wmshell.splash|miui_wm_sight|doUnLockAppAnim|\
 				SurfaceSyncGrou|RenderThread|ControlCenterTr) ;;
 				*) continue ;;
 			esac
@@ -558,7 +566,7 @@ reb_apply_base()
 {
 	reb_apply_cpuset
 	reb_apply_memory
-	reb_apply_little_policy
+	reb_apply_cpu_policies
 }
 
 reb_read_tid_identity()

@@ -108,7 +108,7 @@ private data class ControlState(
     val protectedWriteback: Boolean = true,
     val widgetBoost: Boolean = true,
     val touchFirmware: String = "modern",
-    val swappiness: String = "180",
+    val swappiness: String = "100",
 )
 
 private data class ExecResult(val errno: Int, val stdout: String, val stderr: String)
@@ -140,7 +140,7 @@ private fun parseState(text: String): ControlState {
         protectedWriteback = values["protected_writeback"] != "0",
         widgetBoost = values["widget_boost"] != "0",
         touchFirmware = values["touch_firmware"] ?: "modern",
-        swappiness = values["swappiness"] ?: "180",
+        swappiness = values["swappiness"] ?: "100",
     )
 }
 
@@ -585,8 +585,8 @@ private fun PolicyPager(
     val scrollBehavior = MiuixScrollBehavior()
     val modeValues = listOf("auto", "force", "disabled")
     val modeLabels = listOf("自动", "强制", "停用")
-    val swappinessValues = listOf("160", "180")
-    val swappinessLabels = listOf("均衡 160", "积极 180")
+    val swappinessValues = listOf("80", "100", "160", "180")
+    val swappinessLabels = listOf("极速 80", "流畅 100", "均衡 160", "积极 180")
     val firmwareValues = listOf("modern", "miui125")
     val firmwareLabels = listOf("新版", "MIUI 12.5")
 
