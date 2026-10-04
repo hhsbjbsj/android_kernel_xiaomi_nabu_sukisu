@@ -134,7 +134,7 @@ require_zip_text()
   }
 }
 for required in \
-  'reb_config_get swappiness 180' \
+  'reb_config_get swappiness 100' \
   'REB_WB_FLUSH_SAMPLES=12' \
   'REB_WB_DAILY_PAGES=65536' \
   'reb_write /dev/cpuset/foreground/cpus 0-2,4-7' \
