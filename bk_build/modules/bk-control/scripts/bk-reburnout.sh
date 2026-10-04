@@ -116,6 +116,29 @@ reb_apply_cpu_policies()
 		reb_write "$REB_LITTLE_POLICY/schedutil/hispeed_load" 75
 		reb_write "$REB_LITTLE_POLICY/schedutil/hispeed_freq" 1708800
 	fi
+	REB_GOLD_POLICY=/sys/devices/system/cpu/cpufreq/policy4
+	if [ -d "$REB_GOLD_POLICY" ]; then
+		reb_write "$REB_GOLD_POLICY/schedutil/hispeed_load" 75
+		reb_write "$REB_GOLD_POLICY/schedutil/hispeed_freq" 1920000
+	fi
+	REB_PRIME_POLICY=/sys/devices/system/cpu/cpufreq/policy7
+	if [ -d "$REB_PRIME_POLICY" ]; then
+		reb_write "$REB_PRIME_POLICY/schedutil/hispeed_load" 75
+		reb_write "$REB_PRIME_POLICY/schedutil/hispeed_freq" 2016000
+	fi
+	if [ -d /sys/module/cpu_boost/parameters ]; then
+		reb_write /sys/module/cpu_boost/parameters/input_boost_freq "0:1305600 4:1708800 7:1708800"
+		reb_write /sys/module/cpu_boost/parameters/input_boost_ms 100
+	fi
+}
+
+reb_apply_schedtune()
+{
+	reb_write /dev/stune/top-app/schedtune.boost 10
+	reb_write /dev/stune/top-app/schedtune.prefer_idle 1
+	reb_write /dev/stune/foreground/schedtune.boost 0
+	reb_write /dev/stune/foreground/schedtune.prefer_idle 1
+	reb_write /dev/stune/schedtune.boost 0
 }
 
 reb_apply_memory()
@@ -402,6 +425,8 @@ reb_pin_home()
 			IFS= read -r REB_HOME_COMM < "$REB_HOME_TASK/comm" 2>/dev/null || true
 			case "$REB_HOME_COMM" in
 				RenderThread|HwuiTask*|hwuiTask*|HomeShellAnim|\
+				launcher-load*|launcher-thre*|IconLoader*|ModelLoader*|\
+				PackageUpdate*|ScrollThread*|GestureThread*|WorkspaceAnim*|\
 				SurfaceSyncGrou|AnimThread*|FsGestureSecond)
 					reb_read_allowed_list "${REB_HOME_TASK##*/}"
 					reb_allowed_matches_perf || \
@@ -567,6 +592,7 @@ reb_apply_base()
 	reb_apply_cpuset
 	reb_apply_memory
 	reb_apply_cpu_policies
+	reb_apply_schedtune
 }
 
 reb_read_tid_identity()
@@ -976,19 +1002,19 @@ case "$(uname -r)" in
 	*) reb_log "ignored on incompatible kernel $(uname -r)"; exit 0 ;;
 esac
 
-# service.d starts before Android reports boot completion.  Install the
-# allocation reserve here so it also covers the late modem/QRTR startup burst.
-reb_apply_memory
+# service.d starts before Android reports boot completion.  Install base
+# policies and allocation reserve so they cover boot and lockscreen interactions.
+reb_apply_base
 reb_init_process_reclaim
 
 while [ "$(getprop sys.boot_completed 2>/dev/null)" != "1" ]; do
-	sleep 2
+	sleep 0.5
 done
 
 # HyperOS may configure zram before its encrypted per-boot backing directory
-# and a free loop node are both available.  The kernel accepts this first late
-# backing attachment without resetting active swap.
-reb_setup_zram_backing
+# and a free loop node are both available.  Defer attachment so 1GB fallocate
+# never contends with desktop unlock and initial launcher rendering.
+(sleep 25 && reb_setup_zram_backing) &
 
 REB_BOOT_ID=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)
 if [ -r "$REB_RESTORE_FILE" ]; then
@@ -1004,6 +1030,12 @@ if [ -r "$REB_RESTORE_FILE" ]; then
 	fi
 fi
 
+# Instant Unlock Burst: run hardware at max clock for 3.5s while launcher loads icons & widgets
+reb_apply_base
+reb_screen_on && reb_pin_ui
+reb_enter_mode
+sleep 3.5
+reb_leave_mode
 reb_apply_base
 reb_screen_on && reb_pin_ui
 set -- $(reb_read_cpu_sample)

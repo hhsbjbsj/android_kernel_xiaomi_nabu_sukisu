@@ -16,6 +16,12 @@ install_log_exporter()
 	BK_EXPORT_STAGE=/data/local/tmp/bkk-log-exporter.apk
 	BK_EXPORT_MARKER=/data/adb/bk-kernel/log-exporter.sha256
 	BK_EXPORT_HASH=$(sha256sum "$BK_EXPORT_APK" 2>/dev/null | awk '{ print $1 }')
+	BK_INSTALLED_HASH=$(cat "$BK_EXPORT_MARKER" 2>/dev/null)
+	if [ -n "$BK_EXPORT_HASH" ] && [ "$BK_INSTALLED_HASH" = "$BK_EXPORT_HASH" ]; then
+		return 0
+	fi
+	# Sleep so background package installation never interferes with first unlock or launcher
+	sleep 35
 	BK_EXPORT_TRY=0
 	while [ "$BK_EXPORT_TRY" -lt 60 ]; do
 		BK_EXPORT_VERSION=$(dumpsys package org.bkkernel.logexport 2>/dev/null | \
