@@ -1,5 +1,8 @@
 #!/system/bin/sh
 
+PATH=/system/bin:/system/xbin:/vendor/bin:/data/adb/ksu/bin:$PATH
+export PATH
+
 MODDIR=${0%/*}
 export BK_CONTROL_DIR=$MODDIR
 
@@ -49,16 +52,22 @@ start_touchfeature_aidl()
 	BK_TOUCH_AIDL=$MODDIR/bin/touchfeature_aidl
 	[ -x "$BK_TOUCH_AIDL" ] || return 0
 	BK_WAIT=0
-	while [ "$BK_WAIT" -lt 30 ]; do
-		if service list 2>/dev/null | grep -q "package"; then
+	while [ "$BK_WAIT" -lt 60 ]; do
+		if [ -e /dev/binder ] && [ -e /dev/xiaomi-touch ]; then
 			break
 		fi
 		sleep 1
 		BK_WAIT=$((BK_WAIT + 1))
 	done
-	if ! pgrep -f "^$BK_TOUCH_AIDL$" >/dev/null 2>&1; then
-		(setsid "$BK_TOUCH_AIDL" >/dev/null 2>&1 &)
-	fi
+	(
+		while true; do
+			if ! pidof touchfeature_aidl >/dev/null 2>&1; then
+				log -t TouchFeatureAIDL "Starting touchfeature_aidl daemon"
+				"$BK_TOUCH_AIDL" </dev/null >/dev/null 2>&1 &
+			fi
+			sleep 5
+		done
+	) &
 }
 
 rm -f /data/adb/service.d/bk-reburnout.sh

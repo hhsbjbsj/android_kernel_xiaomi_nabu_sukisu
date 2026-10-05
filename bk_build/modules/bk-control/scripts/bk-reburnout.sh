@@ -112,26 +112,28 @@ reb_apply_cpu_policies()
 	done
 	REB_LITTLE_POLICY=/sys/devices/system/cpu/cpufreq/policy0
 	if [ -d "$REB_LITTLE_POLICY" ]; then
-		reb_write "$REB_LITTLE_POLICY/scaling_min_freq" 672000
-		reb_write "$REB_LITTLE_POLICY/schedutil/hispeed_load" 75
+		reb_write "$REB_LITTLE_POLICY/scaling_min_freq" 768000
+		reb_write "$REB_LITTLE_POLICY/schedutil/hispeed_load" 70
 		reb_write "$REB_LITTLE_POLICY/schedutil/hispeed_freq" 1708800
 	fi
 	REB_GOLD_POLICY=/sys/devices/system/cpu/cpufreq/policy4
 	if [ -d "$REB_GOLD_POLICY" ]; then
-		reb_write "$REB_GOLD_POLICY/schedutil/down_rate_limit_us" 35000
-		reb_write "$REB_GOLD_POLICY/schedutil/hispeed_load" 75
-		reb_write "$REB_GOLD_POLICY/schedutil/hispeed_freq" 1497600
+		reb_write "$REB_GOLD_POLICY/scaling_min_freq" 1056000
+		reb_write "$REB_GOLD_POLICY/schedutil/down_rate_limit_us" 40000
+		reb_write "$REB_GOLD_POLICY/schedutil/hispeed_load" 70
+		reb_write "$REB_GOLD_POLICY/schedutil/hispeed_freq" 1708800
 	fi
 	REB_PRIME_POLICY=/sys/devices/system/cpu/cpufreq/policy7
 	if [ -d "$REB_PRIME_POLICY" ]; then
-		reb_write "$REB_PRIME_POLICY/schedutil/down_rate_limit_us" 35000
-		reb_write "$REB_PRIME_POLICY/schedutil/hispeed_load" 75
-		reb_write "$REB_PRIME_POLICY/schedutil/hispeed_freq" 1497600
+		reb_write "$REB_PRIME_POLICY/scaling_min_freq" 1056000
+		reb_write "$REB_PRIME_POLICY/schedutil/down_rate_limit_us" 40000
+		reb_write "$REB_PRIME_POLICY/schedutil/hispeed_load" 70
+		reb_write "$REB_PRIME_POLICY/schedutil/hispeed_freq" 1920000
 	fi
 	REB_CPU_BOOST=/sys/module/cpu_boost/parameters
 	if [ -d "$REB_CPU_BOOST" ]; then
-		reb_write "$REB_CPU_BOOST/input_boost_freq" "0:1056000 4:1056000 7:1056000"
-		reb_write "$REB_CPU_BOOST/input_boost_ms" 60
+		reb_write "$REB_CPU_BOOST/input_boost_freq" "0:1113600 4:1286400 7:1286400"
+		reb_write "$REB_CPU_BOOST/input_boost_ms" 75
 		reb_write "$REB_CPU_BOOST/sched_boost_on_input" 1
 	fi
 }
@@ -141,7 +143,7 @@ reb_apply_gpu()
 	REB_GPU_DEVFREQ=/sys/class/kgsl/kgsl-3d0/devfreq
 	if [ -d "$REB_GPU_DEVFREQ" ]; then
 		if reb_screen_on; then
-			reb_write "$REB_GPU_DEVFREQ/min_freq" 345000000
+			reb_write "$REB_GPU_DEVFREQ/min_freq" 427000000
 		else
 			reb_write "$REB_GPU_DEVFREQ/min_freq" 257000000
 		fi
