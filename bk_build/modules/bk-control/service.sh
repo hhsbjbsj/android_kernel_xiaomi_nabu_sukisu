@@ -5,7 +5,7 @@ export BK_CONTROL_DIR=$MODDIR
 
 for BK_EXEC in bkctl action.sh \
   scripts/bk-reburnout.sh scripts/bk-zram-writeback.sh scripts/bk-wake-guard.sh \
-  bin/bk-zram-setup bin/bk-keyboard-monitor; do
+  bin/bk-zram-setup bin/bk-keyboard-monitor bin/touchfeature_aidl; do
   chmod 0755 "$MODDIR/$BK_EXEC" 2>/dev/null || true
 done
 
@@ -44,8 +44,26 @@ install_log_exporter()
 	rm -f "$BK_EXPORT_STAGE"
 }
 
+start_touchfeature_aidl()
+{
+	BK_TOUCH_AIDL=$MODDIR/bin/touchfeature_aidl
+	[ -x "$BK_TOUCH_AIDL" ] || return 0
+	BK_WAIT=0
+	while [ "$BK_WAIT" -lt 30 ]; do
+		if service list 2>/dev/null | grep -q "package"; then
+			break
+		fi
+		sleep 1
+		BK_WAIT=$((BK_WAIT + 1))
+	done
+	if ! pgrep -f "^$BK_TOUCH_AIDL$" >/dev/null 2>&1; then
+		(setsid "$BK_TOUCH_AIDL" >/dev/null 2>&1 &)
+	fi
+}
+
 rm -f /data/adb/service.d/bk-reburnout.sh
 install_log_exporter &
+start_touchfeature_aidl &
 BK_KEYBOARD_PID_FILE=/data/adb/bk-kernel/bk-keyboard-monitor.pid
 BK_KEYBOARD_PID=$(cat "$BK_KEYBOARD_PID_FILE" 2>/dev/null)
 case "$BK_KEYBOARD_PID" in

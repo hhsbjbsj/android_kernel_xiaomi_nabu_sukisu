@@ -2,7 +2,8 @@
 
 for file in bkctl service.sh post-fs-data.sh action.sh uninstall.sh \
   scripts/bk-reburnout.sh scripts/bk-zram-writeback.sh \
-  scripts/bk-wake-guard.sh bin/bk-zram-setup bin/bk-keyboard-monitor; do
+  scripts/bk-wake-guard.sh bin/bk-zram-setup bin/bk-keyboard-monitor \
+  bin/touchfeature_aidl; do
   [ -f "$MODPATH/$file" ] || {
     echo "Missing bkk-control file: $file" >&2
     exit 1

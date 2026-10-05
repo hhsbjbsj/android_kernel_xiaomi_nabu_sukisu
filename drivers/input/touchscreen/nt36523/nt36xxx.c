@@ -1903,11 +1903,16 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 				// report pen data
 				pen_x = (uint32_t)(point_data[67] << 8) + (uint32_t)(point_data[68]);
 				pen_y = (uint32_t)(point_data[69] << 8) + (uint32_t)(point_data[70]);
-				if (pen_x >= ts->abs_x_max * 2 - 1) {
-					pen_x -= 1;
-				}
-				if (pen_y >= ts->abs_y_max * 2 - 1) {
-					pen_y -= 1;
+				if (ts->wgp_stylus) {
+					if (pen_x > ts->abs_x_max * 8 - 1)
+						pen_x = ts->abs_x_max * 8 - 1;
+					if (pen_y > ts->abs_y_max * 8 - 1)
+						pen_y = ts->abs_y_max * 8 - 1;
+				} else {
+					if (pen_x > ts->abs_x_max - 1)
+						pen_x = ts->abs_x_max - 1;
+					if (pen_y > ts->abs_y_max - 1)
+						pen_y = ts->abs_y_max - 1;
 				}
 				pen_pressure = (uint32_t)(point_data[71] << 8) + (uint32_t)(point_data[72]);
 				pen_tilt_x = (int32_t)point_data[73];
@@ -2978,8 +2983,8 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 		ts->pen_input_dev->propbit[0] = BIT(INPUT_PROP_DIRECT);
 
 		if (ts->wgp_stylus) {
-			input_set_abs_params(ts->pen_input_dev, ABS_X, 0, ts->abs_x_max * 2 - 1, 0, 0);
-			input_set_abs_params(ts->pen_input_dev, ABS_Y, 0, ts->abs_y_max * 2 - 1, 0, 0);
+			input_set_abs_params(ts->pen_input_dev, ABS_X, 0, ts->abs_x_max * 8 - 1, 0, 0);
+			input_set_abs_params(ts->pen_input_dev, ABS_Y, 0, ts->abs_y_max * 8 - 1, 0, 0);
 		} else {
 			input_set_abs_params(ts->pen_input_dev, ABS_X, 0, ts->abs_x_max - 1, 0, 0);
 			input_set_abs_params(ts->pen_input_dev, ABS_Y, 0, ts->abs_y_max - 1, 0, 0);
@@ -3059,11 +3064,7 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 	ts->fw_mode_applied = NVT_TOUCH_FW_MODERN;
 	ts->fw_mode_applied_valid = false;
 
-#ifdef CONFIG_FACTORY_BUILD
 	ts->pen_input_dev_enable = 1;
-#else
-	ts->pen_input_dev_enable = 0;
-#endif
 
 #if BOOT_UPDATE_FIRMWARE
 	nvt_fwu_wq = alloc_workqueue("nvt_fwu_wq", WQ_UNBOUND | WQ_MEM_RECLAIM, 1);
@@ -3206,6 +3207,9 @@ static int32_t nvt_ts_probe(struct spi_device *client)
 #endif
 
 	bTouchIsAwake = 1;
+	if (ts->pen_support && ts->pen_input_dev_enable) {
+		disable_pen_input_device(false);
+	}
 	NVT_LOG("end\n");
 
 	nvt_irq_enable(true);

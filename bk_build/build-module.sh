@@ -25,6 +25,7 @@ for file in module.prop customize.sh bkctl action.sh service.sh \
   scripts/bk-reburnout.sh scripts/bk-zram-writeback.sh \
   scripts/bk-wake-guard.sh webroot/index.html webroot/bkControl.js \
   webroot/bridge.js webroot/style.css bin/bkk-log-exporter.apk \
+  bin/touchfeature_aidl \
   webroot/composeResources/org.bkkernel.control.generated.resources/drawable/home.svg \
   webroot/composeResources/org.bkkernel.control.generated.resources/drawable/policy.svg \
   webroot/composeResources/org.bkkernel.control.generated.resources/drawable/save_log.svg \
@@ -90,7 +91,8 @@ chmod 0755 "$MODULE_STAGE/bkctl" "$MODULE_STAGE/customize.sh" \
   "$MODULE_STAGE/scripts/bk-zram-writeback.sh" \
   "$MODULE_STAGE/scripts/bk-wake-guard.sh" \
   "$MODULE_STAGE/bin/bk-zram-setup" \
-  "$MODULE_STAGE/bin/bk-keyboard-monitor"
+  "$MODULE_STAGE/bin/bk-keyboard-monitor" \
+  "$MODULE_STAGE/bin/touchfeature_aidl"
 (cd "$MODULE_STAGE" && zip -qr9 "$ZIP_PATH" .)
 
 printf '\n[校验] 检查模块内容与辅助程序\n'
@@ -104,7 +106,7 @@ actual_files=$(unzip -Z1 "$ZIP_PATH" | grep -v '/$' | LC_ALL=C sort)
 unzip -p "$ZIP_PATH" module.prop | grep -Fx 'id=bk-control' >/dev/null || {
   echo "module ID is missing" >&2; exit 1;
 }
-for name in bk-zram-setup bk-keyboard-monitor; do
+for name in bk-zram-setup bk-keyboard-monitor touchfeature_aidl; do
   magic=$(unzip -p "$ZIP_PATH" "bin/$name" | \
     dd bs=1 count=4 2>/dev/null | od -An -tx1 | tr -d ' \n')
   [ "$magic" = 7f454c46 ] || {
