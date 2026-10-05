@@ -118,11 +118,21 @@ reb_apply_cpu_policies()
 	fi
 	REB_GOLD_POLICY=/sys/devices/system/cpu/cpufreq/policy4
 	if [ -d "$REB_GOLD_POLICY" ]; then
-		reb_write "$REB_GOLD_POLICY/schedutil/hispeed_load" 80
+		reb_write "$REB_GOLD_POLICY/schedutil/down_rate_limit_us" 35000
+		reb_write "$REB_GOLD_POLICY/schedutil/hispeed_load" 75
+		reb_write "$REB_GOLD_POLICY/schedutil/hispeed_freq" 1497600
 	fi
 	REB_PRIME_POLICY=/sys/devices/system/cpu/cpufreq/policy7
 	if [ -d "$REB_PRIME_POLICY" ]; then
-		reb_write "$REB_PRIME_POLICY/schedutil/hispeed_load" 80
+		reb_write "$REB_PRIME_POLICY/schedutil/down_rate_limit_us" 35000
+		reb_write "$REB_PRIME_POLICY/schedutil/hispeed_load" 75
+		reb_write "$REB_PRIME_POLICY/schedutil/hispeed_freq" 1497600
+	fi
+	REB_CPU_BOOST=/sys/module/cpu_boost/parameters
+	if [ -d "$REB_CPU_BOOST" ]; then
+		reb_write "$REB_CPU_BOOST/input_boost_freq" "0:1056000 4:1056000 7:1056000"
+		reb_write "$REB_CPU_BOOST/input_boost_ms" 60
+		reb_write "$REB_CPU_BOOST/sched_boost_on_input" 1
 	fi
 }
 
@@ -148,6 +158,8 @@ reb_apply_memory()
 	reb_write /proc/sys/vm/dirty_ratio 15
 	reb_write /proc/sys/vm/dirty_background_ratio 5
 	reb_write /proc/sys/vm/page-cluster 0
+	reb_write /sys/block/zram0/max_comp_streams 8
+	reb_write /sys/kernel/mm/transparent_hugepage/defrag defer+madvise
 	reb_apply_swappiness
 }
 
@@ -473,7 +485,8 @@ reb_tune_transition_threads()
 			case "$REB_UI_COMM" in
 				wmshell.main|wmshell.anim|wmshell.recents*|recents.anim*|\
 				wm-transition*|wmshell.splash|miui_wm_sight|doUnLockAppAnim|\
-				SurfaceSyncGrou|RenderThread|ControlCenterTr) ;;
+				SurfaceSyncGrou|RenderThread|ControlCenterTr|\
+				AnimThread*|FsGestureSecond|ShellTransition*|wmshell.trans*) ;;
 				*) continue ;;
 			esac
 			printf '%s\n' "$REB_UI_TID" >> "$REB_UI_TIDS_TMP"

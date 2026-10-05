@@ -43,6 +43,8 @@ setup_ufs_io()
 		printf '%s\n' 512 > "$BK_UFS_LUN/read_ahead_kb" 2>/dev/null || true
 		printf '%s\n' 256 > "$BK_UFS_LUN/nr_requests" 2>/dev/null || true
 		printf '%s\n' 0 > "$BK_UFS_LUN/iostats" 2>/dev/null || true
+		printf '%s\n' 0 > "$BK_UFS_LUN/nomerges" 2>/dev/null || true
+		printf '%s\n' 2 > "$BK_UFS_LUN/rq_affinity" 2>/dev/null || true
 	done
 }
 
@@ -64,8 +66,19 @@ setup_extphone_stub()
 	done
 }
 
+setup_cpu_boost()
+{
+	BK_CPU_BOOST=/sys/module/cpu_boost/parameters
+	[ -d "$BK_CPU_BOOST" ] || return 0
+	printf '%s\n' "0:1056000 4:1056000 7:1056000" > "$BK_CPU_BOOST/input_boost_freq" 2>/dev/null || true
+	printf '%s\n' 60 > "$BK_CPU_BOOST/input_boost_ms" 2>/dev/null || true
+	printf '%s\n' 1 > "$BK_CPU_BOOST/sched_boost_on_input" 2>/dev/null || true
+}
+
 rm -f /data/adb/post-fs-data.d/bk-zram-writeback.sh
 setup_miui_keyboard
 setup_ufs_io
+setup_cpu_boost
 setup_extphone_stub
 "$MODDIR/scripts/bk-zram-writeback.sh"
+
