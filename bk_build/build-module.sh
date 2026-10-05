@@ -21,11 +21,11 @@ done
   echo "AOSP Clang r547379 is required" >&2; exit 2;
 }
 for file in module.prop customize.sh bkctl action.sh service.sh \
-  post-fs-data.sh uninstall.sh skip_mount \
+  post-fs-data.sh uninstall.sh skip_mount supervise.sh boot-completed.sh pen.conf \
   scripts/bk-reburnout.sh scripts/bk-zram-writeback.sh \
   scripts/bk-wake-guard.sh webroot/index.html webroot/bkControl.js \
   webroot/bridge.js webroot/style.css bin/bkk-log-exporter.apk \
-  bin/touchfeature_aidl \
+  bin/touchfeature_aidl bin/penabs \
   webroot/composeResources/org.bkkernel.control.generated.resources/drawable/home.svg \
   webroot/composeResources/org.bkkernel.control.generated.resources/drawable/policy.svg \
   webroot/composeResources/org.bkkernel.control.generated.resources/drawable/save_log.svg \
@@ -49,7 +49,8 @@ case "$MODULE_VERSION" in
     echo "invalid bkk-control version: $MODULE_VERSION" >&2; exit 2 ;;
 esac
 for script in customize.sh bkctl action.sh service.sh post-fs-data.sh \
-  uninstall.sh scripts/bk-reburnout.sh scripts/bk-zram-writeback.sh \
+  uninstall.sh supervise.sh boot-completed.sh \
+  scripts/bk-reburnout.sh scripts/bk-zram-writeback.sh \
   scripts/bk-wake-guard.sh; do
   sh -n "$MODULE_DIR/$script"
 done
@@ -87,12 +88,15 @@ cp "$ARTIFACTS/bk-keyboard-monitor" "$MODULE_STAGE/bin/bk-keyboard-monitor"
 chmod 0755 "$MODULE_STAGE/bkctl" "$MODULE_STAGE/customize.sh" \
   "$MODULE_STAGE/service.sh" "$MODULE_STAGE/post-fs-data.sh" \
   "$MODULE_STAGE/action.sh" "$MODULE_STAGE/uninstall.sh" \
+  "$MODULE_STAGE/supervise.sh" "$MODULE_STAGE/boot-completed.sh" \
   "$MODULE_STAGE/scripts/bk-reburnout.sh" \
   "$MODULE_STAGE/scripts/bk-zram-writeback.sh" \
   "$MODULE_STAGE/scripts/bk-wake-guard.sh" \
   "$MODULE_STAGE/bin/bk-zram-setup" \
   "$MODULE_STAGE/bin/bk-keyboard-monitor" \
-  "$MODULE_STAGE/bin/touchfeature_aidl"
+  "$MODULE_STAGE/bin/touchfeature_aidl" \
+  "$MODULE_STAGE/bin/penabs"
+chmod 0644 "$MODULE_STAGE/pen.conf"
 (cd "$MODULE_STAGE" && zip -qr9 "$ZIP_PATH" .)
 
 printf '\n[校验] 检查模块内容与辅助程序\n'
@@ -106,7 +110,7 @@ actual_files=$(unzip -Z1 "$ZIP_PATH" | grep -v '/$' | LC_ALL=C sort)
 unzip -p "$ZIP_PATH" module.prop | grep -Fx 'id=bk-control' >/dev/null || {
   echo "module ID is missing" >&2; exit 1;
 }
-for name in bk-zram-setup bk-keyboard-monitor touchfeature_aidl; do
+for name in bk-zram-setup bk-keyboard-monitor touchfeature_aidl penabs; do
   magic=$(unzip -p "$ZIP_PATH" "bin/$name" | \
     dd bs=1 count=4 2>/dev/null | od -An -tx1 | tr -d ' \n')
   [ "$magic" = 7f454c46 ] || {

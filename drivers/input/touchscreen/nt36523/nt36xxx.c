@@ -2156,12 +2156,12 @@ static void nvt_init_touchmode_data(void)
 	xiaomi_touch_interfaces.touch_mode[Touch_Resist_RF][SET_CUR_VALUE] = 0;
 	xiaomi_touch_interfaces.touch_mode[Touch_Resist_RF][GET_CUR_VALUE] = 0;
 
-	/* Pen enable mode */
-	xiaomi_touch_interfaces.touch_mode[Touch_Pen_ENABLE][GET_MAX_VALUE] = 1;
+	/* Pen enable mode - support 1 (gen1), 2, 17 (gen2), 18 */
+	xiaomi_touch_interfaces.touch_mode[Touch_Pen_ENABLE][GET_MAX_VALUE] = 255;
 	xiaomi_touch_interfaces.touch_mode[Touch_Pen_ENABLE][GET_MIN_VALUE] = 0;
-	xiaomi_touch_interfaces.touch_mode[Touch_Pen_ENABLE][GET_DEF_VALUE] = 1;
-	xiaomi_touch_interfaces.touch_mode[Touch_Pen_ENABLE][SET_CUR_VALUE] = 1;
-	xiaomi_touch_interfaces.touch_mode[Touch_Pen_ENABLE][GET_CUR_VALUE] = 1;
+	xiaomi_touch_interfaces.touch_mode[Touch_Pen_ENABLE][GET_DEF_VALUE] = 17;
+	xiaomi_touch_interfaces.touch_mode[Touch_Pen_ENABLE][SET_CUR_VALUE] = 17;
+	xiaomi_touch_interfaces.touch_mode[Touch_Pen_ENABLE][GET_CUR_VALUE] = 17;
 
 	for (i = 0; i < Touch_Mode_NUM; i++) {
 		NVT_LOG("mode:%d, set cur:%d, get cur:%d, def:%d min:%d max:%d\n",
@@ -2367,9 +2367,9 @@ static int nvt_set_cur_value(int nvt_mode, int nvt_value)
 		return 0;
 	} else if (nvt_mode == Touch_Pen_ENABLE && ts && nvt_value >= 0) {
 		ts->pen_input_dev_enable = !!nvt_value;
-		xiaomi_touch_interfaces.touch_mode[Touch_Pen_ENABLE][SET_CUR_VALUE] = ts->pen_input_dev_enable;
-		xiaomi_touch_interfaces.touch_mode[Touch_Pen_ENABLE][GET_CUR_VALUE] = ts->pen_input_dev_enable;
-		NVT_LOG("%s pen input dev", ts->pen_input_dev_enable ? "ENABLE" : "DISABLE");
+		xiaomi_touch_interfaces.touch_mode[Touch_Pen_ENABLE][SET_CUR_VALUE] = nvt_value;
+		xiaomi_touch_interfaces.touch_mode[Touch_Pen_ENABLE][GET_CUR_VALUE] = nvt_value;
+		NVT_LOG("%s pen input dev (val=%d)", ts->pen_input_dev_enable ? "ENABLE" : "DISABLE", nvt_value);
 		disable_pen_input_device(!ts->pen_input_dev_enable);
 		release_pen_event();
 		return 0;
@@ -2463,8 +2463,16 @@ static int nvt_get_mode_value(int mode, int value_type)
 {
 	int value = -1;
 
-	if (mode == Touch_Pen_ENABLE)
-		return ts ? ts->pen_input_dev_enable : 1;
+	if (mode == Touch_Pen_ENABLE) {
+		if (value_type == GET_CUR_VALUE || value_type == SET_CUR_VALUE)
+			return xiaomi_touch_interfaces.touch_mode[Touch_Pen_ENABLE][GET_CUR_VALUE];
+		else if (value_type == GET_DEF_VALUE)
+			return xiaomi_touch_interfaces.touch_mode[Touch_Pen_ENABLE][GET_DEF_VALUE];
+		else if (value_type == GET_MIN_VALUE)
+			return xiaomi_touch_interfaces.touch_mode[Touch_Pen_ENABLE][GET_MIN_VALUE];
+		else if (value_type == GET_MAX_VALUE)
+			return xiaomi_touch_interfaces.touch_mode[Touch_Pen_ENABLE][GET_MAX_VALUE];
+	}
 
 	if (mode < Touch_Mode_NUM && mode >= 0)
 		value = xiaomi_touch_interfaces.touch_mode[mode][value_type];
@@ -2477,10 +2485,10 @@ static int nvt_get_mode_value(int mode, int value_type)
 static int nvt_get_mode_all(int mode, int *value)
 {
 	if (mode == Touch_Pen_ENABLE) {
-		value[0] = ts ? ts->pen_input_dev_enable : 1;
-		value[1] = 1;
-		value[2] = 0;
-		value[3] = 1;
+		value[0] = xiaomi_touch_interfaces.touch_mode[Touch_Pen_ENABLE][GET_CUR_VALUE];
+		value[1] = xiaomi_touch_interfaces.touch_mode[Touch_Pen_ENABLE][GET_DEF_VALUE];
+		value[2] = xiaomi_touch_interfaces.touch_mode[Touch_Pen_ENABLE][GET_MIN_VALUE];
+		value[3] = xiaomi_touch_interfaces.touch_mode[Touch_Pen_ENABLE][GET_MAX_VALUE];
 		return 0;
 	}
 

@@ -75,10 +75,28 @@ setup_cpu_boost()
 	printf '%s\n' 1 > "$BK_CPU_BOOST/sched_boost_on_input" 2>/dev/null || true
 }
 
+setup_pen_support()
+{
+	BK_PEN_DIR=/data/adb/modules/touchfeature_aidl
+	mkdir -p "$BK_PEN_DIR" 2>/dev/null || true
+	if [ -f "$MODDIR/pen.conf" ]; then
+		if [ ! -f "$BK_PEN_DIR/pen.conf" ] || ! grep -q 'candidates=' "$BK_PEN_DIR/pen.conf" 2>/dev/null; then
+			cp -f "$MODDIR/pen.conf" "$BK_PEN_DIR/pen.conf" 2>/dev/null || true
+			chmod 0644 "$BK_PEN_DIR/pen.conf" 2>/dev/null || true
+		fi
+	fi
+	chmod 0755 "$MODDIR/bin/touchfeature_aidl" "$MODDIR/bin/penabs" \
+		"$MODDIR/supervise.sh" "$MODDIR/boot-completed.sh" 2>/dev/null || true
+	if [ -x "$MODDIR/bin/penabs" ]; then
+		"$MODDIR/bin/penabs" >/dev/null 2>&1 || true
+	fi
+}
+
 rm -f /data/adb/post-fs-data.d/bk-zram-writeback.sh
 setup_miui_keyboard
 setup_ufs_io
 setup_cpu_boost
+setup_pen_support
 setup_extphone_stub
 "$MODDIR/scripts/bk-zram-writeback.sh"
 

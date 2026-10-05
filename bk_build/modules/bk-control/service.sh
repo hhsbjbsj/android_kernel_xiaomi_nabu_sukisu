@@ -6,9 +6,9 @@ export PATH
 MODDIR=${0%/*}
 export BK_CONTROL_DIR=$MODDIR
 
-for BK_EXEC in bkctl action.sh \
+for BK_EXEC in bkctl action.sh supervise.sh boot-completed.sh \
   scripts/bk-reburnout.sh scripts/bk-zram-writeback.sh scripts/bk-wake-guard.sh \
-  bin/bk-zram-setup bin/bk-keyboard-monitor bin/touchfeature_aidl; do
+  bin/bk-zram-setup bin/bk-keyboard-monitor bin/touchfeature_aidl bin/penabs; do
   chmod 0755 "$MODDIR/$BK_EXEC" 2>/dev/null || true
 done
 
@@ -51,6 +51,12 @@ start_touchfeature_aidl()
 {
 	BK_TOUCH_AIDL=$MODDIR/bin/touchfeature_aidl
 	[ -x "$BK_TOUCH_AIDL" ] || return 0
+
+	mkdir -p /data/adb/modules/touchfeature_aidl 2>/dev/null || true
+	if [ -f "$MODDIR/pen.conf" ] && [ ! -f /data/adb/modules/touchfeature_aidl/pen.conf ]; then
+		cp -f "$MODDIR/pen.conf" /data/adb/modules/touchfeature_aidl/pen.conf 2>/dev/null || true
+	fi
+
 	BK_WAIT=0
 	while [ "$BK_WAIT" -lt 60 ]; do
 		if [ -e /dev/binder ] && [ -e /dev/xiaomi-touch ]; then
@@ -59,15 +65,20 @@ start_touchfeature_aidl()
 		sleep 1
 		BK_WAIT=$((BK_WAIT + 1))
 	done
-	(
-		while true; do
-			if ! pidof touchfeature_aidl >/dev/null 2>&1; then
-				log -t TouchFeatureAIDL "Starting touchfeature_aidl daemon"
-				"$BK_TOUCH_AIDL" </dev/null >/dev/null 2>&1 &
-			fi
-			sleep 5
-		done
-	) &
+
+	if [ -x "$MODDIR/supervise.sh" ]; then
+		"$MODDIR/supervise.sh" >/dev/null 2>&1 &
+	else
+		(
+			while true; do
+				if ! pidof touchfeature_aidl >/dev/null 2>&1 && ! pgrep -f "touchfeature_aidl" >/dev/null 2>&1; then
+					log -t TouchFeatureAIDL "Starting touchfeature_aidl daemon"
+					"$BK_TOUCH_AIDL" </dev/null >/dev/null 2>&1 &
+				fi
+				sleep 5
+			done
+		) &
+	fi
 }
 
 rm -f /data/adb/service.d/bk-reburnout.sh
