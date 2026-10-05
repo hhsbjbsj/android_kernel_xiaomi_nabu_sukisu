@@ -20,6 +20,17 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Free Disk Space and Setup 16GB Swap
+        run: |
+          sudo swapoff -a || true
+          sudo rm -f /swapfile || true
+          sudo fallocate -l 16G /mnt/swapfile || sudo dd if=/dev/zero of=/mnt/swapfile bs=1M count=16384
+          sudo chmod 600 /mnt/swapfile
+          sudo mkswap /mnt/swapfile
+          sudo swapon /mnt/swapfile
+          sudo sysctl -w vm.swappiness=60
+          free -h
+
       - name: Install System Dependencies
         run: |
           sudo apt-get update
