@@ -18,6 +18,7 @@ endif
 # Optimize scheduler hot paths with -O2 for peak interactive responsiveness
 CFLAGS_core.o += -O2
 CFLAGS_fair.o += -O2
+CFLAGS_rt.o += -O2
 CFLAGS_cpufreq_schedutil.o += -O2
 
 obj-y += core.o loadavg.o clock.o cputime.o

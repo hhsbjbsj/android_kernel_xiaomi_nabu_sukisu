@@ -81,9 +81,9 @@ reb_daemon_running()
 reb_apply_cpuset()
 {
 	reb_write /dev/cpuset/background/cpus 0-2
-	reb_write /dev/cpuset/system-background/cpus 0-2,4-7
-	reb_write /dev/cpuset/foreground/cpus 0-2,4-7
-	reb_write /dev/cpuset/audio-app/cpus 0-2,4-7
+	reb_write /dev/cpuset/system-background/cpus 0-3,4-7
+	reb_write /dev/cpuset/foreground/cpus 0-3,4-7
+	reb_write /dev/cpuset/audio-app/cpus 0-3,4-7
 	reb_write /dev/cpuset/top-app/cpus 0-7
 }
 
@@ -113,27 +113,28 @@ reb_apply_cpu_policies()
 	REB_LITTLE_POLICY=/sys/devices/system/cpu/cpufreq/policy0
 	if [ -d "$REB_LITTLE_POLICY" ]; then
 		reb_write "$REB_LITTLE_POLICY/scaling_min_freq" 768000
-		reb_write "$REB_LITTLE_POLICY/schedutil/hispeed_load" 70
+		reb_write "$REB_LITTLE_POLICY/schedutil/hispeed_load" 65
 		reb_write "$REB_LITTLE_POLICY/schedutil/hispeed_freq" 1708800
 	fi
 	REB_GOLD_POLICY=/sys/devices/system/cpu/cpufreq/policy4
 	if [ -d "$REB_GOLD_POLICY" ]; then
 		reb_write "$REB_GOLD_POLICY/scaling_min_freq" 1056000
 		reb_write "$REB_GOLD_POLICY/schedutil/down_rate_limit_us" 40000
-		reb_write "$REB_GOLD_POLICY/schedutil/hispeed_load" 70
-		reb_write "$REB_GOLD_POLICY/schedutil/hispeed_freq" 1708800
+		reb_write "$REB_GOLD_POLICY/schedutil/hispeed_load" 55
+		reb_write "$REB_GOLD_POLICY/schedutil/hispeed_freq" 1804800
 	fi
 	REB_PRIME_POLICY=/sys/devices/system/cpu/cpufreq/policy7
 	if [ -d "$REB_PRIME_POLICY" ]; then
 		reb_write "$REB_PRIME_POLICY/scaling_min_freq" 1056000
 		reb_write "$REB_PRIME_POLICY/schedutil/down_rate_limit_us" 40000
-		reb_write "$REB_PRIME_POLICY/schedutil/hispeed_load" 70
-		reb_write "$REB_PRIME_POLICY/schedutil/hispeed_freq" 1920000
+		reb_write "$REB_PRIME_POLICY/schedutil/hispeed_load" 50
+		reb_write "$REB_PRIME_POLICY/schedutil/hispeed_freq" 2016000
 	fi
 	REB_CPU_BOOST=/sys/module/cpu_boost/parameters
 	if [ -d "$REB_CPU_BOOST" ]; then
-		reb_write "$REB_CPU_BOOST/input_boost_freq" "0:1113600 4:1286400 7:1286400"
-		reb_write "$REB_CPU_BOOST/input_boost_ms" 75
+		reb_write "$REB_CPU_BOOST/input_boost_freq" "0:1209600 4:1516800 7:1708800"
+		reb_write "$REB_CPU_BOOST/input_boost_ms" 90
+		reb_write "$REB_CPU_BOOST/min_input_interval" 40
 		reb_write "$REB_CPU_BOOST/sched_boost_on_input" 1
 	fi
 }

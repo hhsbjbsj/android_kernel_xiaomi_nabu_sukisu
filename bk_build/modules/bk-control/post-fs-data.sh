@@ -46,6 +46,12 @@ setup_ufs_io()
 		printf '%s\n' 0 > "$BK_UFS_LUN/nomerges" 2>/dev/null || true
 		printf '%s\n' 2 > "$BK_UFS_LUN/rq_affinity" 2>/dev/null || true
 	done
+	for BK_DM_QUEUE in /sys/block/dm-*/queue; do
+		[ -d "$BK_DM_QUEUE" ] || continue
+		printf '%s\n' 512 > "$BK_DM_QUEUE/read_ahead_kb" 2>/dev/null || true
+		printf '%s\n' 0 > "$BK_DM_QUEUE/iostats" 2>/dev/null || true
+		printf '%s\n' 2 > "$BK_DM_QUEUE/rq_affinity" 2>/dev/null || true
+	done
 }
 
 setup_extphone_stub()
