@@ -81,9 +81,9 @@ reb_daemon_running()
 reb_apply_cpuset()
 {
 	reb_write /dev/cpuset/background/cpus 0-2
-	reb_write /dev/cpuset/system-background/cpus 0-3,4-7
-	reb_write /dev/cpuset/foreground/cpus 0-3,4-7
-	reb_write /dev/cpuset/audio-app/cpus 0-3,4-7
+	reb_write /dev/cpuset/system-background/cpus 0-2,4-7
+	reb_write /dev/cpuset/foreground/cpus 0-2,4-7
+	reb_write /dev/cpuset/audio-app/cpus 0-2,4-7
 	reb_write /dev/cpuset/top-app/cpus 0-7
 }
 
