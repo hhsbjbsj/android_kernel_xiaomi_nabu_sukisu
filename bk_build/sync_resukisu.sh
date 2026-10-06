@@ -61,7 +61,7 @@ sed -i "s/KSU_TAG_NAME\s*:=.*/KSU_TAG_NAME := $KSU_TAG/g" "$DEST_DIR/Kbuild"
 sed -i "s/KSU_COMMIT_SHA\s*:=.*/KSU_COMMIT_SHA := $KSU_COMMIT/g" "$DEST_DIR/Kbuild"
 sed -i "s/KSU_BRANCH_NAME\s*:=.*/KSU_BRANCH_NAME := main/g" "$DEST_DIR/Kbuild"
 sed -i 's/REPO_NAME := .*/REPO_NAME := BakaSU/g' "$DEST_DIR/Kbuild"
-echo 'ccflags-y += -DEXPECTED_SIZE=0x38b -DEXPECTED_HASH=\"aaf4f7590df8e55068503e29c58f7e9d5699f0c72bd31a7561cc36c0d044af11\"' >> "$DEST_DIR/Kbuild"
+echo 'ccflags-y += -DEXPECTED_SIZE=0x039a -DEXPECTED_HASH=\"366aa724f4ed84d589fb47077cee4dc6aac45c37c4a50a6e1eaed4446bb3bc03\"' >> "$DEST_DIR/Kbuild"
 
 # 6. Enable allow_shell = true for ADB root
 echo "[+] Enabling allow_shell = true in core/init.c..."
@@ -145,14 +145,14 @@ if ksud_path.exists():
 ms_path = Path("drivers/kernelsu/manager/manager_sign.h")
 if ms_path.exists():
     ms = ms_path.read_text(encoding="utf-8")
-    if "0x38b" not in ms:
+    if "0x039a" not in ms:
         custom_def = (
             "\n// Custom Manager (User Customized)\n"
             "#ifndef EXPECTED_SIZE\n"
-            "#define EXPECTED_SIZE 0x38b\n"
+            "#define EXPECTED_SIZE 0x039a\n"
             "#endif\n"
             "#ifndef EXPECTED_HASH\n"
-            '#define EXPECTED_HASH "aaf4f7590df8e55068503e29c58f7e9d5699f0c72bd31a7561cc36c0d044af11"\n'
+            '#define EXPECTED_HASH "366aa724f4ed84d589fb47077cee4dc6aac45c37c4a50a6e1eaed4446bb3bc03"\n'
             "#endif\n"
         )
         guard = "#endif /* MANAGER_SIGN_H */"
@@ -161,7 +161,7 @@ if ms_path.exists():
         else:
             ms += custom_def
         ms_path.write_text(ms, encoding="utf-8")
-        print("  - Updated manager_sign.h: injected custom manager credentials (0x38b)")
+        print("  - Updated manager_sign.h: injected custom manager credentials (0x039a)")
 
 as_path = Path("drivers/kernelsu/manager/apk_sign.c")
 if as_path.exists():
