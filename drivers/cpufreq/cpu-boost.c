@@ -22,6 +22,8 @@
 #include <linux/slab.h>
 #include <linux/input.h>
 #include <linux/time.h>
+#include <linux/mutex.h>
+#include <linux/msm_drm_notify.h>
 
 struct cpu_sync {
 	int cpu;
@@ -33,25 +35,33 @@ static DEFINE_PER_CPU(struct cpu_sync, sync_info);
 static struct workqueue_struct *cpu_boost_wq;
 
 static struct work_struct input_boost_work;
+static struct work_struct wake_boost_work;
+
+static DEFINE_MUTEX(boost_lock);
 
 static bool input_boost_enabled;
 
 static unsigned int input_boost_ms = 40;
 module_param(input_boost_ms, uint, 0644);
 
+static unsigned int wake_boost_ms = 1000;
+module_param(wake_boost_ms, uint, 0644);
+
 static unsigned int sched_boost_on_input;
 module_param(sched_boost_on_input, uint, 0644);
 
 static bool sched_boost_active;
+static bool screen_is_off;
 
 static struct delayed_work input_boost_rem;
+static unsigned long boost_expiry;
 static u64 last_input_time;
 static unsigned int min_input_interval = 40;
 module_param(min_input_interval, uint, 0644);
 
 static int set_input_boost_freq(const char *buf, const struct kernel_param *kp)
 {
-	int i, ntokens = 0;
+	int i, ntokens = 0, ret = 0;
 	unsigned int val, cpu;
 	const char *cp = buf;
 	bool enabled = false;
@@ -59,25 +69,35 @@ static int set_input_boost_freq(const char *buf, const struct kernel_param *kp)
 	while ((cp = strpbrk(cp + 1, " :")))
 		ntokens++;
 
+	mutex_lock(&boost_lock);
+
 	/* single number: apply to all CPUs */
 	if (!ntokens) {
-		if (sscanf(buf, "%u\n", &val) != 1)
-			return -EINVAL;
+		if (sscanf(buf, "%u\n", &val) != 1) {
+			ret = -EINVAL;
+			goto out;
+		}
 		for_each_possible_cpu(i)
 			per_cpu(sync_info, i).input_boost_freq = val;
 		goto check_enable;
 	}
 
 	/* CPU:value pair */
-	if (!(ntokens % 2))
-		return -EINVAL;
+	if (!(ntokens % 2)) {
+		ret = -EINVAL;
+		goto out;
+	}
 
 	cp = buf;
 	for (i = 0; i < ntokens; i += 2) {
-		if (sscanf(cp, "%u:%u", &cpu, &val) != 2)
-			return -EINVAL;
-		if (cpu >= num_possible_cpus())
-			return -EINVAL;
+		if (sscanf(cp, "%u:%u", &cpu, &val) != 2) {
+			ret = -EINVAL;
+			goto out;
+		}
+		if (cpu >= num_possible_cpus()) {
+			ret = -EINVAL;
+			goto out;
+		}
 
 		per_cpu(sync_info, cpu).input_boost_freq = val;
 		cp = strnchr(cp, PAGE_SIZE - (cp - buf), ' ');
@@ -93,7 +113,9 @@ check_enable:
 	}
 	input_boost_enabled = enabled;
 
-	return 0;
+out:
+	mutex_unlock(&boost_lock);
+	return ret;
 }
 
 static int get_input_boost_freq(char *buf, const struct kernel_param *kp)
@@ -165,10 +187,72 @@ static void update_policy_online(void)
 	put_online_cpus();
 }
 
+static void do_boost(unsigned int duration_ms)
+{
+	unsigned int i, ret;
+	struct cpu_sync *i_sync_info;
+	unsigned long new_expiry;
+
+	mutex_lock(&boost_lock);
+
+	if (!input_boost_enabled || screen_is_off) {
+		mutex_unlock(&boost_lock);
+		return;
+	}
+
+	new_expiry = jiffies + msecs_to_jiffies(duration_ms);
+	if (time_after(new_expiry, boost_expiry))
+		boost_expiry = new_expiry;
+
+	/* Set the input_boost_min for all CPUs in the system */
+	pr_debug("Setting boost min for all CPUs\n");
+	for_each_possible_cpu(i) {
+		i_sync_info = &per_cpu(sync_info, i);
+		i_sync_info->input_boost_min = i_sync_info->input_boost_freq;
+	}
+
+	/* Update policies for all online CPUs */
+	update_policy_online();
+
+	/* Enable scheduler boost to migrate tasks to big cluster */
+	if (sched_boost_on_input > 0 && !sched_boost_active) {
+		ret = sched_set_boost(sched_boost_on_input);
+		if (ret)
+			pr_err("cpu-boost: sched boost enable failed\n");
+		else
+			sched_boost_active = true;
+	}
+
+	mod_delayed_work(cpu_boost_wq, &input_boost_rem,
+			 time_after(boost_expiry, jiffies) ? (boost_expiry - jiffies) : 0);
+
+	mutex_unlock(&boost_lock);
+}
+
+static void do_input_boost(struct work_struct *work)
+{
+	do_boost(input_boost_ms);
+}
+
+static void do_wake_boost(struct work_struct *work)
+{
+	do_boost(wake_boost_ms);
+}
+
 static void do_input_boost_rem(struct work_struct *work)
 {
 	unsigned int i, ret;
 	struct cpu_sync *i_sync_info;
+
+	mutex_lock(&boost_lock);
+
+	/* If boost was extended, reschedule until expiry */
+	if (time_after(boost_expiry, jiffies)) {
+		mod_delayed_work(cpu_boost_wq, &input_boost_rem,
+				 boost_expiry - jiffies);
+		mutex_unlock(&boost_lock);
+		return;
+	}
 
 	/* Reset the input_boost_min for all CPUs in the system */
 	pr_debug("Resetting input boost min for all CPUs\n");
@@ -186,40 +270,8 @@ static void do_input_boost_rem(struct work_struct *work)
 			pr_err("cpu-boost: sched boost disable failed\n");
 		sched_boost_active = false;
 	}
-}
 
-static void do_input_boost(struct work_struct *work)
-{
-	unsigned int i, ret;
-	struct cpu_sync *i_sync_info;
-
-	cancel_delayed_work_sync(&input_boost_rem);
-	if (sched_boost_active) {
-		sched_set_boost(0);
-		sched_boost_active = false;
-	}
-
-	/* Set the input_boost_min for all CPUs in the system */
-	pr_debug("Setting input boost min for all CPUs\n");
-	for_each_possible_cpu(i) {
-		i_sync_info = &per_cpu(sync_info, i);
-		i_sync_info->input_boost_min = i_sync_info->input_boost_freq;
-	}
-
-	/* Update policies for all online CPUs */
-	update_policy_online();
-
-	/* Enable scheduler boost to migrate tasks to big cluster */
-	if (sched_boost_on_input > 0) {
-		ret = sched_set_boost(sched_boost_on_input);
-		if (ret)
-			pr_err("cpu-boost: sched boost enable failed\n");
-		else
-			sched_boost_active = true;
-	}
-
-	queue_delayed_work(cpu_boost_wq, &input_boost_rem,
-					msecs_to_jiffies(input_boost_ms));
+	mutex_unlock(&boost_lock);
 }
 
 static void cpuboost_input_event(struct input_handle *handle,
@@ -227,7 +279,7 @@ static void cpuboost_input_event(struct input_handle *handle,
 {
 	u64 now;
 
-	if (!input_boost_enabled)
+	if (!input_boost_enabled || screen_is_off)
 		return;
 
 	now = ktime_to_us(ktime_get());
@@ -312,6 +364,35 @@ static struct input_handler cpuboost_input_handler = {
 	.id_table       = cpuboost_ids,
 };
 
+static int cpuboost_drm_notifier_cb(struct notifier_block *nb,
+				     unsigned long action, void *data)
+{
+	struct msm_drm_notifier *evdata = data;
+	int *blank;
+
+	if (action != MSM_DRM_EARLY_EVENT_BLANK || !evdata || !evdata->data)
+		return NOTIFY_OK;
+
+	blank = evdata->data;
+
+	if (*blank == MSM_DRM_BLANK_UNBLANK) {
+		screen_is_off = false;
+		if (wake_boost_ms > 0 && input_boost_enabled)
+			queue_work(cpu_boost_wq, &wake_boost_work);
+	} else if (*blank == MSM_DRM_BLANK_POWERDOWN) {
+		screen_is_off = true;
+		boost_expiry = jiffies;
+		mod_delayed_work(cpu_boost_wq, &input_boost_rem, 0);
+	}
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block cpuboost_drm_nb = {
+	.notifier_call = cpuboost_drm_notifier_cb,
+	.priority = INT_MAX,
+};
+
 static int cpu_boost_init(void)
 {
 	int cpu, ret;
@@ -322,6 +403,7 @@ static int cpu_boost_init(void)
 		return -EFAULT;
 
 	INIT_WORK(&input_boost_work, do_input_boost);
+	INIT_WORK(&wake_boost_work, do_wake_boost);
 	INIT_DELAYED_WORK(&input_boost_rem, do_input_boost_rem);
 
 	for_each_possible_cpu(cpu) {
@@ -331,6 +413,13 @@ static int cpu_boost_init(void)
 	cpufreq_register_notifier(&boost_adjust_nb, CPUFREQ_POLICY_NOTIFIER);
 
 	ret = input_register_handler(&cpuboost_input_handler);
+	if (ret)
+		pr_err("cpu-boost: failed to register input handler\n");
+
+	ret = msm_drm_register_client(&cpuboost_drm_nb);
+	if (ret)
+		pr_err("cpu-boost: failed to register msm_drm notifier\n");
+
 	return 0;
 }
 late_initcall(cpu_boost_init);

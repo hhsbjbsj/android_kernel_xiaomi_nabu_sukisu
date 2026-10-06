@@ -78,6 +78,7 @@ setup_cpu_boost()
 	[ -d "$BK_CPU_BOOST" ] || return 0
 	printf '%s\n' "0:1113600 4:1286400 7:1286400" > "$BK_CPU_BOOST/input_boost_freq" 2>/dev/null || true
 	printf '%s\n' 75 > "$BK_CPU_BOOST/input_boost_ms" 2>/dev/null || true
+	printf '%s\n' 1000 > "$BK_CPU_BOOST/wake_boost_ms" 2>/dev/null || true
 	printf '%s\n' 1 > "$BK_CPU_BOOST/sched_boost_on_input" 2>/dev/null || true
 }
 

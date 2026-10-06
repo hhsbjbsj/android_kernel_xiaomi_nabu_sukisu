@@ -134,6 +134,7 @@ reb_apply_cpu_policies()
 	if [ -d "$REB_CPU_BOOST" ]; then
 		reb_write "$REB_CPU_BOOST/input_boost_freq" "0:1209600 4:1516800 7:1708800"
 		reb_write "$REB_CPU_BOOST/input_boost_ms" 90
+		reb_write "$REB_CPU_BOOST/wake_boost_ms" 1000
 		reb_write "$REB_CPU_BOOST/min_input_interval" 40
 		reb_write "$REB_CPU_BOOST/sched_boost_on_input" 1
 	fi
@@ -143,11 +144,7 @@ reb_apply_gpu()
 {
 	REB_GPU_DEVFREQ=/sys/class/kgsl/kgsl-3d0/devfreq
 	if [ -d "$REB_GPU_DEVFREQ" ]; then
-		if reb_screen_on; then
-			reb_write "$REB_GPU_DEVFREQ/min_freq" 427000000
-		else
-			reb_write "$REB_GPU_DEVFREQ/min_freq" 257000000
-		fi
+		reb_write "$REB_GPU_DEVFREQ/min_freq" 427000000
 	fi
 }
 
@@ -376,7 +373,7 @@ reb_allowed_matches_perf()
 
 reb_pin_composer()
 {
-	REB_COMPOSER_PIDS=$(pidof vendor.qti.hardware.display.composer-service 2>/dev/null)
+	REB_COMPOSER_PIDS=$(pidof vendor.qti.hardware.display.composer-service surfaceflinger 2>/dev/null)
 	REB_COMPOSER_TASK_COUNT=0
 	REB_COMPOSER_REFRESH=0
 	for REB_PROCESS_PID in $REB_COMPOSER_PIDS; do
@@ -436,6 +433,7 @@ reb_pin_home()
 			REB_HOME_COMM=
 			IFS= read -r REB_HOME_COMM < "$REB_HOME_TASK/comm" 2>/dev/null || true
 			case "$REB_HOME_COMM" in
+				Folme*|IconAnim*|UnlockAnim*|*Transition*|GLThread*|wmshell.*|\
 				RenderThread|HwuiTask*|hwuiTask*|HomeShellAnim|\
 				SurfaceSyncGrou|AnimThread*|FsGestureSecond)
 					reb_read_allowed_list "${REB_HOME_TASK##*/}"
