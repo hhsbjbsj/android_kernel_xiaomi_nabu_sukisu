@@ -154,6 +154,12 @@ if ms_path.exists():
             "#ifndef EXPECTED_HASH\n"
             '#define EXPECTED_HASH "366aa724f4ed84d589fb47077cee4dc6aac45c37c4a50a6e1eaed4446bb3bc03"\n'
             "#endif\n"
+            "#ifndef EXPECTED_SIZE_CUSTOM_V1\n"
+            "#define EXPECTED_SIZE_CUSTOM_V1 0x38b\n"
+            "#endif\n"
+            "#ifndef EXPECTED_HASH_CUSTOM_V1\n"
+            '#define EXPECTED_HASH_CUSTOM_V1 "aaf4f7590df8e55068503e29c58f7e9d5699f0c72bd31a7561cc36c0d044af11"\n'
+            "#endif\n"
         )
         guard = "#endif /* MANAGER_SIGN_H */"
         if guard in ms:
@@ -172,7 +178,10 @@ if as_path.exists():
     new_block = """static apk_sign_key_t apk_sign_keys[] = {
     { EXPECTED_SIZE_BAKASU, EXPECTED_HASH_BAKASU }, /* Baka-SU/BakaSU */
 #ifdef EXPECTED_SIZE
-    { EXPECTED_SIZE, EXPECTED_HASH }, // Custom
+    { EXPECTED_SIZE, EXPECTED_HASH }, // Custom (0x039a)
+#endif
+#ifdef EXPECTED_SIZE_CUSTOM_V1
+    { EXPECTED_SIZE_CUSTOM_V1, EXPECTED_HASH_CUSTOM_V1 }, // Custom (0x38b)
 #endif
 #ifdef CONFIG_KSU_MULTI_MANAGER_SUPPORT"""
     if old_block in as_code and "#ifdef EXPECTED_SIZE" not in as_code[:as_code.find(old_block) + 200]:

@@ -33,6 +33,13 @@
 #define EXPECTED_HASH "366aa724f4ed84d589fb47077cee4dc6aac45c37c4a50a6e1eaed4446bb3bc03"
 #endif
 
+#ifndef EXPECTED_SIZE_CUSTOM_V1
+#define EXPECTED_SIZE_CUSTOM_V1 0x38b
+#endif
+#ifndef EXPECTED_HASH_CUSTOM_V1
+#define EXPECTED_HASH_CUSTOM_V1 "aaf4f7590df8e55068503e29c58f7e9d5699f0c72bd31a7561cc36c0d044af11"
+#endif
+
 typedef struct {
     unsigned size;
     const char *sha256;
