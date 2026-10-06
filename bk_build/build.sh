@@ -107,7 +107,7 @@ for symbol in MACH_XIAOMI_NABU BPF BPF_SYSCALL BPF_JIT BPF_JIT_ALWAYS_ON \
   IP_NF_TARGET_MASQUERADE NETFILTER_XT_TARGET_TCPMSS \
   NETFILTER_XT_MATCH_ADDRTYPE IP_ADVANCED_ROUTER IP_MULTIPLE_TABLES \
   PREEMPT__LL PREEMPT CPU_FREQ_GOV_SCHEDUTIL \
-  CC_OPTIMIZE_FOR_PERFORMANCE DEBUG_INFO \
+  CC_OPTIMIZE_FOR_SIZE DEBUG_INFO \
   LRU_GEN ZRAM ZRAM_WRITEBACK \
   DEBUG_INFO_DWARF4 DEBUG_INFO_BTF DEBUG_FS KALLSYMS FRAME_POINTER \
   PRINTK_TIME PSTORE \
@@ -135,7 +135,7 @@ for symbol in KSU_SUSFS \
   }
 done
 for symbol in DEBUG_INFO_REDUCED DEBUG_INFO_SPLIT DEBUG_KERNEL DYNAMIC_DEBUG \
-  KALLSYMS_ALL CC_OPTIMIZE_FOR_SIZE SCHED_WALT IRQ_TIME_ACCOUNTING \
+  KALLSYMS_ALL CC_OPTIMIZE_FOR_PERFORMANCE SCHED_WALT IRQ_TIME_ACCOUNTING \
   PREEMPT_RT_FULL PREEMPT_RTB PREEMPT_RT_BASE RCU_BOOST; do
   if grep -q "^CONFIG_$symbol=" "$OUT_DIR/.config"; then
     echo "required config is not disabled: CONFIG_$symbol" >&2; exit 1
@@ -228,8 +228,8 @@ image_magic=$(gzip -dc "$BOOT/Image.gz" | dd bs=1 skip=56 count=4 2>/dev/null | 
 }
 cp "$BOOT/Image.gz" "$OUT_DIR/artifacts/Image.gz"
 arm64_image_size=$(od -An -tu8 -j16 -N8 "$BOOT/Image" | tr -d ' \n')
-[ "$arm64_image_size" -le 67108864 ] || {
-  echo "arm64 Image exceeds nabu 64 MiB boot window: $arm64_image_size bytes" >&2
+[ "$((arm64_image_size + 524288))" -le 67108864 ] || {
+  echo "arm64 Image exceeds nabu 64 MiB boot window: $((arm64_image_size + 524288)) bytes (max 67108864)" >&2
   exit 1
 }
 for name in sm8150 sm8150p sm8150p-v2 sm8150-v2; do
