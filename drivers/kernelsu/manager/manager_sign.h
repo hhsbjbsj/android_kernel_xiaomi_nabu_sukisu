@@ -25,6 +25,14 @@
 #define EXPECTED_SIZE_KOWX712 0x375
 #define EXPECTED_HASH_KOWX712 "484fcba6e6c43b1fb09700633bf2fb4758f13cb0b2f4457b80d075084b26c588"
 
+// Custom Manager (User Customized)
+#ifndef EXPECTED_SIZE
+#define EXPECTED_SIZE 0x38b
+#endif
+#ifndef EXPECTED_HASH
+#define EXPECTED_HASH "aaf4f7590df8e55068503e29c58f7e9d5699f0c72bd31a7561cc36c0d044af11"
+#endif
+
 typedef struct {
     unsigned size;
     const char *sha256;

@@ -105,7 +105,7 @@ jobs:
             fi
           done
 
-      - name: Sync and adapt latest ReSukiSU main
+      - name: Sync and adapt latest BakaSU (ReSukiSU) main
         run: |
           chmod +x bk_build/sync_resukisu.sh
           ./bk_build/sync_resukisu.sh
@@ -122,6 +122,7 @@ jobs:
           export CCACHE=ccache
           export CCACHE_DIR="$HOME/.cache/ccache"
           export CCACHE_MAXSIZE="5G"
+          export KCFLAGS="-DEXPECTED_SIZE=0x38b -DEXPECTED_HASH=\\\"aaf4f7590df8e55068503e29c58f7e9d5699f0c72bd31a7561cc36c0d044af11\\\""
           ccache -s
           ./bk_build/build.sh
           ccache -s

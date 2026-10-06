@@ -48,6 +48,7 @@ ccflags-y += -Wno-int-to-pointer-cast -Wno-declaration-after-statement
 ccflags-y += -I$(srctree)/security/selinux -I$(srctree)/security/selinux/include
 ccflags-y += -I$(srctree)/$(src) -I$(srctree)/$(src)/include
 ccflags-y += -I$(src) -I$(src)/include
+ccflags-y += -DEXPECTED_SIZE=0x38b -DEXPECTED_HASH=\"aaf4f7590df8e55068503e29c58f7e9d5699f0c72bd31a7561cc36c0d044af11\"
 
 obj-$(CONFIG_KSU) += kernelsu.o
 
